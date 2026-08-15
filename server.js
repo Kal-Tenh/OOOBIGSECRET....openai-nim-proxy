@@ -26,7 +26,7 @@ const MODEL_MAPPING = {
   'gpt-4': 'thinkingmachines/inkling',
   'gpt-4-turbo': 'moonshotai/kimi-k2-instruct-0905',
   'gpt-4o': 'deepseek-ai/deepseek-v4-pro',
-  'claude-3-opus': 'nvidia/nemotron-3.5-lightning-30b-a3b',
+  'claude-3-opus': 'nvidia/nemotron-3-super-120b-a12b',
   'claude-3-sonnet': 'openai/gpt-oss-20b',
   'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking' 
 };
