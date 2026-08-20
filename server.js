@@ -25,9 +25,9 @@ const MODEL_MAPPING = {
   'gpt-3.5-turbo': 'z-ai/glm-5.2',
   'gpt-4': 'thinkingmachines/inkling',
   'gpt-4-turbo': 'meta/llama-3.1-8b-instruct',
-  'gpt-4o': 'deepseek-ai/deepseek-v4-pro',
+  'gpt-4o': 'meta/muse-glimmer-30b',
   'claude-3-opus': 'nvidia/nemotron-3-super-120b-a12b',
-  'claude-3-sonnet': 'openai/gpt-oss-20b',
+  'claude-3-sonnet': 'stepfun-ai/step-3.7-flash',
   'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking' 
 };
 
