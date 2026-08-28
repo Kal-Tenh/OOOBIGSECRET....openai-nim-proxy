@@ -64,6 +64,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     
     // Smart model selection with fallback
     let nimModel = MODEL_MAPPING[model];
+    console.log(`Incoming model: "${model}" | Mapped to: "${nimModel}"`);
     if (!nimModel) {
       try {
         await axios.post(`${NIM_API_BASE}/chat/completions`, {
