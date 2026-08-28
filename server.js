@@ -28,8 +28,8 @@ const MODEL_MAPPING = {
   'gpt-4o': 'meta/muse-glimmer-30b',
   'claude-3-opus': 'nvidia/nemotron-3-super-120b-a12b',
   'claude-3-sonnet': 'deepseek-v4-pro-0813',
-  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking' 
-  'moonshotai/kimi-k3': 'moonshotai/kimi-k3'
+  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking',
+  'kimi-k3': 'moonshotai/kimi-k3'
 };
 
 // Health check endpoint
