@@ -1,3 +1,4 @@
+
 // server.js - OpenAI to NVIDIA NIM API Proxy
 const express = require('express');
 const cors = require('cors');
@@ -23,12 +24,14 @@ const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwarg
 // Model mapping (adjust based on available NIM models)
 const MODEL_MAPPING = {
   'gpt-3.5-turbo': 'deepseek-ai/deepseek-v4-flash-0731',
-  'gpt-4': 'thinkingmachines/inkling',
+  'gpt-4': 'moonshotai/kimi-k3',
   'gpt-4-turbo': 'meta/llama-3.1-8b-instruct',
   'gpt-4o': 'meta/muse-glimmer-30b',
   'claude-3-opus': 'nvidia/nemotron-3-super-120b-a12b',
   'claude-3-sonnet': 'stepfun-ai/step-3.7-flash',
-  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking', 
+  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking',
+  'claude-3-sonnet': 'deepseek-v4-pro-0813',
+  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking',
   'kimi-k3': 'moonshotai/kimi-k3'
 };
 
@@ -64,6 +67,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     
     // Smart model selection with fallback
     let nimModel = MODEL_MAPPING[model];
+    console.log(`Incoming model: "${model}" | Mapped to: "${nimModel}"`);
     if (!nimModel) {
       try {
         await axios.post(`${NIM_API_BASE}/chat/completions`, {
@@ -104,12 +108,13 @@ app.post('/v1/chat/completions', async (req, res) => {
     
     // Make request to NVIDIA NIM API
     const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
-      headers: {
-        'Authorization': `Bearer ${NIM_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      responseType: stream ? 'stream' : 'json'
-    });
+  headers: {
+    'Authorization': `Bearer ${NIM_API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  responseType: stream ? 'stream' : 'json',
+  timeout: 120000
+});
     
     if (stream) {
       // Handle streaming response with reasoning
