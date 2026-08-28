@@ -28,7 +28,8 @@ const MODEL_MAPPING = {
   'gpt-4o': 'meta/muse-glimmer-30b',
   'claude-3-opus': 'nvidia/nemotron-3-super-120b-a12b',
   'claude-3-sonnet': 'stepfun-ai/step-3.7-flash',
-  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking' 
+  'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking', 
+  'kimi-k3': 'moonshotai/kimi-k3'
 };
 
 // Health check endpoint
@@ -243,3 +244,4 @@ app.listen(PORT, () => {
   console.log(`Reasoning display: ${SHOW_REASONING ? 'ENABLED' : 'DISABLED'}`);
   console.log(`Thinking mode: ${ENABLE_THINKING_MODE ? 'ENABLED' : 'DISABLED'}`);
 });
+
