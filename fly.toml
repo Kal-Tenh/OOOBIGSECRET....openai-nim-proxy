@@ -1,4 +1,4 @@
-app = "ooobigsecret....-openai-nim-proxy"
+app = "ooobigsecret-openai-nim-proxy"
 primary_region = "sin"
 
 [env]
