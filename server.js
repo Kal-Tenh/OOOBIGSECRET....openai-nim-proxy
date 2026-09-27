@@ -28,7 +28,10 @@ const MODEL_MAPPING = {
   'gpt-3.5-turbo': 'deepseek-ai/deepseek-v4-flash-0731',
   'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking',
   'claude-3-sonnet': 'deepseek-v4-pro-0813',
-  'kimi-k3': 'moonshotai/kimi-k3'
+  'kimi-k3': 'moonshotai/kimi-k3',
+  'deepseek': 'deepseek-ai/deepseek-v4.1-flash'
+
+
 };
 
 // Health check endpoint
