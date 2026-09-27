@@ -135,14 +135,17 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
 
     // Make request to NVIDIA NIM API
-    const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
-      headers: {
-        'Authorization': `Bearer ${NIM_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      responseType: stream ? 'stream' : 'json',
-      validateStatus: (status) => status < 400 // let 4xx/5xx fall into catch with real body
-    });
+const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
+  headers: {
+    'Authorization': `Bearer ${NIM_API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  responseType: stream ? 'stream' : 'json',
+  validateStatus: (status) => status < 400, // let 4xx/5xx fall into catch with real body
+  timeout: 60000 // 60 detik
+});
+
+console.log(`Request to NIM (${nimModel}) completed with status ${response.status}`);
 
     if (stream) {
       // Handle streaming response with reasoning
