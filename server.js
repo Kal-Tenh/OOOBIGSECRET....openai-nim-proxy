@@ -25,8 +25,10 @@ if (!NIM_API_KEY) {
 // 🔥 REASONING DISPLAY TOGGLE - Shows/hides reasoning in output
 const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
 
-// 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
-const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
+// 🔥 THINKING MODE TOGGLE
+// false = ask each model to think as little as possible (see THINKING_OFF below)
+// true  = turn thinking on
+const ENABLE_THINKING_MODE = false;
 
 // 🔥 KEEP-ALIVE - Stops the host's gateway from cutting the connection while NVIDIA is slow.
 // If NVIDIA hasn't answered after KEEPALIVE_DELAY_MS, we open the response and send a tiny
@@ -52,6 +54,20 @@ const MODEL_MAPPING = {
 // Params that specific NIM models reject (they return 400 "immutable")
 const STRIP_PARAMS = {
   'moonshotai/kimi-k3': ['frequency_penalty', 'presence_penalty']
+};
+
+// Per-model "thinking off" settings, sent as chat_template_kwargs.
+// Each model family uses different flags, so they are not shared:
+//  - GLM-5.3 has no real on/off switch (its template ignores enable_thinking),
+//    so the best we can do is lowest reasoning effort.
+//  - Kimi K3 accepts a plain off switch.
+//  - DeepSeek V4.1 Flash: thinking:false is the best known flag.
+// Models not listed here get no chat_template_kwargs at all.
+const THINKING_OFF = {
+  'z-ai/glm-5.3': { reasoning_effort: 'low' },
+  'z-ai/glm-5.3-flash': { reasoning_effort: 'low' },
+  'moonshotai/kimi-k3': { thinking: false, enable_thinking: false },
+  'deepseek-ai/deepseek-v4.1-flash': { thinking: false }
 };
 
 // Cache for unmapped model probes so we only probe each name once
@@ -255,8 +271,11 @@ app.post('/v1/chat/completions', async (req, res) => {
     if (presence_penalty !== undefined) nimRequest.presence_penalty = presence_penalty;
     if (frequency_penalty !== undefined) nimRequest.frequency_penalty = frequency_penalty;
 
+    // Thinking control (per model, see THINKING_OFF above)
     if (ENABLE_THINKING_MODE) {
       nimRequest.chat_template_kwargs = { thinking: true };
+    } else if (THINKING_OFF[nimModel]) {
+      nimRequest.chat_template_kwargs = THINKING_OFF[nimModel];
     }
 
     (STRIP_PARAMS[nimModel] || []).forEach((p) => delete nimRequest[p]);
