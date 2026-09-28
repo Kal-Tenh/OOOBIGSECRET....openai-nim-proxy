@@ -142,7 +142,6 @@ const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest
   },
   responseType: stream ? 'stream' : 'json',
   validateStatus: (status) => status < 400, // let 4xx/5xx fall into catch with real body
-  timeout: 60000 // 60 detik
 });
 
 console.log(`Request to NIM (${nimModel}) completed with status ${response.status}`);
