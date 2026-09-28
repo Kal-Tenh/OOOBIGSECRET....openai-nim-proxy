@@ -28,6 +28,8 @@ const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
 // 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
 const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
 
+
+
 // Model mapping (adjust based on available NIM models)
 const MODEL_MAPPING = {
   'glm-5.3': 'z-ai/glm-5.3',
@@ -37,6 +39,11 @@ const MODEL_MAPPING = {
   'claude-3-sonnet': 'deepseek-v4-pro-0813',
   'kimi-k3': 'moonshotai/kimi-k3',
   'deepseek': 'deepseek-ai/deepseek-v4.1-flash'
+};
+
+// Params that specific NIM models reject (they return 400 "immutable")
+const STRIP_PARAMS = {
+  'moonshotai/kimi-k3': ['frequency_penalty', 'presence_penalty']
 };
 
 // Cache for unmapped model probes so we only probe each name once
@@ -190,6 +197,8 @@ app.post('/v1/chat/completions', async (req, res) => {
     if (ENABLE_THINKING_MODE) {
       nimRequest.chat_template_kwargs = { thinking: true };
     }
+
+    (STRIP_PARAMS[nimModel] || []).forEach((p) => delete nimRequest[p]);
 
     // Make request to NVIDIA NIM API
     const response = await axios.post(`${NIM_API_BASE}/chat/completions`, nimRequest, {
