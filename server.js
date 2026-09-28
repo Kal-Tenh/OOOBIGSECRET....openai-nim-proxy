@@ -296,11 +296,11 @@ console.log(`Request to NIM (${nimModel}) completed with status ${response.statu
   }
 });
 
-// Catch-all for unsupported endpoints
-app.all('*', (req, res) => {
+// Catch-all for unsupported endpointsapp.all('*', (req, res) => {
+  console.log(`404: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     error: {
-      message: `Endpoint ${req.path} not found`,
+      message: `Endpoint ${req.method} ${req.path} not found`,
       type: 'invalid_request_error',
       code: 404
     }
