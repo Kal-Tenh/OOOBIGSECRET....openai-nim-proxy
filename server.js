@@ -41,7 +41,7 @@ const UPSTREAM_TIMEOUT_MS = 240000;
 // Model mapping (adjust based on available NIM models)
 const MODEL_MAPPING = {
   'glm-5.3': 'z-ai/glm-5.3',
-  'glm-5.3-flash': 'z-ai/glm-5-3-flash',
+  'glm-5.3-flash': 'z-ai/glm-5.3-flash',
   'gpt-3.5-turbo': 'deepseek-ai/deepseek-v4-flash-0731',
   'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking',
   'claude-3-sonnet': 'deepseek-v4-pro-0813',
