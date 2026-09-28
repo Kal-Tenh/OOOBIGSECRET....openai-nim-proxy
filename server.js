@@ -305,7 +305,7 @@ console.log(`Request to NIM (${nimModel}) completed with status ${response.statu
       code: 404
     }
   });
-});
+
 
 app.listen(PORT, () => {
   console.log(`OpenAI to NVIDIA NIM Proxy running on port ${PORT}`);
