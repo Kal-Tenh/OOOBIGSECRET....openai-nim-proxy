@@ -1,4 +1,4 @@
-// server.js - OpenAI to NVIDIA NIM API Proxy
+// server.js - OpenAI to NVIDIA NIM API Proxy (with keep-alive for slow models)
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -28,7 +28,15 @@ const SHOW_REASONING = false; // Set to true to show reasoning with <think> tags
 // 🔥 THINKING MODE TOGGLE - Enables thinking for specific models that support it
 const ENABLE_THINKING_MODE = false; // Set to true to enable chat_template_kwargs thinking parameter
 
+// 🔥 KEEP-ALIVE - Stops the host's gateway from cutting the connection while NVIDIA is slow.
+// If NVIDIA hasn't answered after KEEPALIVE_DELAY_MS, we open the response and send a tiny
+// ping every KEEPALIVE_INTERVAL_MS until the real reply is ready.
+const KEEPALIVE_ENABLED = true;
+const KEEPALIVE_DELAY_MS = 10000;
+const KEEPALIVE_INTERVAL_MS = 10000;
 
+// Upstream timeout (keep this below JanitorAI's 300000 ms limit)
+const UPSTREAM_TIMEOUT_MS = 240000;
 
 // Model mapping (adjust based on available NIM models)
 const MODEL_MAPPING = {
@@ -97,6 +105,7 @@ app.get('/health', (req, res) => {
     service: 'OpenAI to NVIDIA NIM Proxy',
     reasoning_display: SHOW_REASONING,
     thinking_mode: ENABLE_THINKING_MODE,
+    keepalive: KEEPALIVE_ENABLED,
     api_key_configured: Boolean(NIM_API_KEY),
     proxy_auth_enabled: Boolean(PROXY_API_KEY)
   });
@@ -159,6 +168,21 @@ async function resolveModel(model) {
 
 // Chat completions endpoint (main proxy)
 app.post('/v1/chat/completions', async (req, res) => {
+  let keepAliveTimer = null;
+  let keepAliveInterval = null;
+  const controller = new AbortController();
+
+  const stopKeepAlive = () => {
+    if (keepAliveTimer) { clearTimeout(keepAliveTimer); keepAliveTimer = null; }
+    if (keepAliveInterval) { clearInterval(keepAliveInterval); keepAliveInterval = null; }
+  };
+
+  // Client left before we finished: stop timers and cancel the upstream request
+  res.on('close', () => {
+    stopKeepAlive();
+    if (!res.writableFinished) controller.abort();
+  });
+
   try {
     const {
       model, messages, temperature, max_tokens, stream,
@@ -175,6 +199,43 @@ app.post('/v1/chat/completions', async (req, res) => {
       return res.status(400).json({
         error: { message: '"messages" is required and must be an array', type: 'invalid_request_error', code: 400 }
       });
+    }
+
+    const setSSEHeaders = () => {
+      res.status(200);
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // stop proxies from buffering the stream
+    };
+
+    // Keep-alive: if NVIDIA is slow, open the response and send tiny pings so the
+    // host's gateway doesn't kill the connection. Fast requests are unaffected.
+    if (KEEPALIVE_ENABLED) {
+      keepAliveTimer = setTimeout(() => {
+        keepAliveTimer = null;
+        if (res.headersSent || res.writableEnded) return;
+
+        let ping;
+        if (stream) {
+          setSSEHeaders();
+          ping = ': keep-alive\n\n'; // SSE comment, ignored by clients
+        } else {
+          res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no'
+          });
+          ping = ' '; // leading whitespace is valid before JSON
+        }
+        res.flushHeaders();
+        res.write(ping);
+        console.log(`Keep-alive started (${stream ? 'stream' : 'non-stream'})`);
+
+        keepAliveInterval = setInterval(() => {
+          try { res.write(ping); } catch (e) {}
+        }, KEEPALIVE_INTERVAL_MS);
+      }, KEEPALIVE_DELAY_MS);
     }
 
     const nimModel = await resolveModel(model);
@@ -207,24 +268,20 @@ app.post('/v1/chat/completions', async (req, res) => {
         'Content-Type': 'application/json'
       },
       responseType: stream ? 'stream' : 'json',
-      timeout: 300000, // 5 minutes, reasoning models can be slow
+      timeout: UPSTREAM_TIMEOUT_MS,
+      signal: controller.signal,
       validateStatus: (status) => status < 400 // 4xx/5xx go to catch with the real body
     });
 
+    stopKeepAlive();
     console.log(`Request to NIM (${nimModel}) completed with status ${response.status}`);
 
     if (stream) {
       // Streaming response
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      res.setHeader('X-Accel-Buffering', 'no'); // stop proxies from buffering the stream
-      res.flushHeaders();
-
-      // Stop upstream generation if the client disconnects
-      res.on('close', () => {
-        try { response.data.destroy(); } catch (e) {}
-      });
+      if (!res.headersSent) {
+        setSSEHeaders();
+        res.flushHeaders();
+      }
 
       let buffer = '';
       let reasoningStarted = false;
@@ -301,6 +358,22 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
       };
 
+      // Keep the connection alive during long reasoning phases where we hide reasoning
+      let lastWrite = Date.now();
+      const streamPing = setInterval(() => {
+        if (Date.now() - lastWrite > KEEPALIVE_INTERVAL_MS) {
+          try { res.write(': keep-alive\n\n'); lastWrite = Date.now(); } catch (e) {}
+        }
+      }, KEEPALIVE_INTERVAL_MS);
+
+      res.on('close', () => {
+        clearInterval(streamPing);
+        try { response.data.destroy(); } catch (e) {}
+      });
+
+      const origWrite = res.write.bind(res);
+      res.write = (...args) => { lastWrite = Date.now(); return origWrite(...args); };
+
       response.data.on('data', (chunk) => {
         buffer += chunk.toString();
         const lines = buffer.split('\n');
@@ -309,11 +382,13 @@ app.post('/v1/chat/completions', async (req, res) => {
       });
 
       response.data.on('end', () => {
+        clearInterval(streamPing);
         if (buffer.trim()) processLine(buffer);
         res.end();
       });
 
       response.data.on('error', (err) => {
+        clearInterval(streamPing);
         console.error('Stream error:', err.message);
         try {
           res.write(`data: ${JSON.stringify({ error: { message: err.message || 'Stream error' } })}\n\n`);
@@ -354,9 +429,22 @@ app.post('/v1/chat/completions', async (req, res) => {
         }
       };
 
-      res.json(openaiResponse);
+      if (res.headersSent) {
+        // Keep-alive already opened the response, so finish it manually
+        res.end(JSON.stringify(openaiResponse));
+      } else {
+        res.json(openaiResponse);
+      }
     }
   } catch (error) {
+    stopKeepAlive();
+
+    // Client already left, nothing to send
+    if (error.code === 'ERR_CANCELED' || controller.signal.aborted) {
+      console.log('Client disconnected before the reply was ready');
+      return;
+    }
+
     await readErrorBody(error);
 
     const status = error.response?.status || 500;
@@ -368,19 +456,30 @@ app.post('/v1/chat/completions', async (req, res) => {
       data: error.response?.data
     });
 
-    // If headers were already sent (mid-stream failure), just end the connection
-    if (res.headersSent) {
-      try { res.end(); } catch (e) {}
-      return;
-    }
-
-    res.status(status).json({
+    const errorBody = {
       error: {
         message: message,
         type: 'invalid_request_error',
         code: status
       }
-    });
+    };
+
+    // Keep-alive already sent a 200 header, so the error has to go in the body
+    if (res.headersSent) {
+      try {
+        const isSSE = String(res.getHeader('Content-Type') || '').includes('text/event-stream');
+        if (isSSE) {
+          res.write(`data: ${JSON.stringify(errorBody)}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+        } else {
+          res.end(JSON.stringify(errorBody));
+        }
+      } catch (e) {}
+      return;
+    }
+
+    res.status(status).json(errorBody);
   }
 });
 
@@ -401,6 +500,7 @@ app.listen(PORT, () => {
   console.log(`Health check: http://localhost:${PORT}/health`);
   console.log(`Reasoning display: ${SHOW_REASONING ? 'ENABLED' : 'DISABLED'}`);
   console.log(`Thinking mode: ${ENABLE_THINKING_MODE ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`Keep-alive: ${KEEPALIVE_ENABLED ? 'ENABLED' : 'DISABLED'}`);
   console.log(`NIM_API_KEY configured: ${NIM_API_KEY ? 'YES' : 'NO - set this env var!'}`);
   console.log(`Proxy auth: ${PROXY_API_KEY ? 'ENABLED' : 'DISABLED (anyone with the URL can use it)'}`);
 });
