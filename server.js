@@ -107,6 +107,7 @@ async function readErrorBody(error) {
 app.use('/v1', (req, res, next) => {
   if (!PROXY_API_KEY) return next();
   if (req.headers.authorization !== `Bearer ${PROXY_API_KEY}`) {
+    console.log('401: wrong or missing proxy key');
     return res.status(401).json({
       error: { message: 'Unauthorized', type: 'invalid_request_error', code: 401 }
     });
@@ -184,8 +185,9 @@ async function resolveModel(model) {
 
 // Chat completions endpoint (main proxy)
 app.post('/v1/chat/completions', async (req, res) => {
+  const t0 = Date.now();
+  const elapsed = () => ((Date.now() - t0) / 1000).toFixed(0) + 's';
   let keepAliveTimer = null;
-  let keepAliveInterval = null;
   const controller = new AbortController();
 
   const stopKeepAlive = () => {
@@ -522,4 +524,5 @@ app.listen(PORT, () => {
   console.log(`Keep-alive: ${KEEPALIVE_ENABLED ? 'ENABLED' : 'DISABLED'}`);
   console.log(`NIM_API_KEY configured: ${NIM_API_KEY ? 'YES' : 'NO - set this env var!'}`);
   console.log(`Proxy auth: ${PROXY_API_KEY ? 'ENABLED' : 'DISABLED (anyone with the URL can use it)'}`);
+  console.log(`Request to NIM (${nimModel}) completed with status ${response.status} after ${elapsed()}`);
 });
