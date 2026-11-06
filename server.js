@@ -51,8 +51,8 @@ const UPSTREAM_TIMEOUT_MS = 240000;
 
 // Names clients can use -> real NIM model ids
 const MODEL_MAPPING = {
-  'mistralai/mistral-large-4-1t-a52b',
-  'stepfun-ai/step-5-preview',
+  'mistral': 'mistralai/mistral-large-4-1t-a52b',
+  'stepfun': 'stepfun-ai/step-5-preview',
   'glm-5.3-flash': 'z-ai/glm-5.3-flash',
   'gpt-3.5-turbo': 'deepseek-ai/deepseek-v4-flash-0731',
   'gemini-pro': 'qwen/qwen3-next-80b-a3b-thinking',
